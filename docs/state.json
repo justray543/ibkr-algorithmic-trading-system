@@ -1,18 +1,18 @@
 {
-  "generated_at": "2026-07-23T00:08:23",
+  "generated_at": "2026-07-24T23:47:46",
   "mode": "paper",
   "currency": "USD",
   "inception": {
     "date": "2026-07-20",
     "starting_capital": 1000000.0,
-    "days_live": 3
+    "days_live": 4
   },
   "performance": {
-    "nav": 1016667.12,
-    "return_pct": 1.67,
-    "pnl_abs": 16667.12,
-    "history_points": 2,
-    "max_drawdown_pct": -0.36,
+    "nav": 980176.77,
+    "return_pct": -1.98,
+    "pnl_abs": -19823.23,
+    "history_points": 3,
+    "max_drawdown_pct": -3.93,
     "sharpe": null,
     "sortino": null,
     "volatility_pct": null,
@@ -22,31 +22,35 @@
   "equity": {
     "dates": [
       "2026-07-22",
-      "2026-07-23"
+      "2026-07-23",
+      "2026-07-24"
     ],
     "strategy": [
       1020309.34,
-      1016667.12
+      1016667.12,
+      980176.77
     ],
     "benchmark": [
-      967160.93,
-      967160.93
+      979479.52,
+      991037.03,
+      981445.08
     ],
     "drawdown": [
       0.0,
-      -0.357
+      -0.357,
+      -3.933
     ]
   },
   "drawdown_detail": {
-    "depth_pct": -0.36,
+    "depth_pct": -3.93,
     "peak_date": "2026-07-22",
-    "trough_date": "2026-07-23",
+    "trough_date": "2026-07-24",
     "recovery_date": null,
     "is_recovered": false,
-    "decline_days": 1,
+    "decline_days": 2,
     "recovery_days": 0,
-    "longest_underwater_days": 1,
-    "currently_underwater_pct": -0.36
+    "longest_underwater_days": 2,
+    "currently_underwater_pct": -3.93
   },
   "rolling": {
     "sharpe": {
@@ -56,21 +60,29 @@
     },
     "win_rate": []
   },
-  "markers": [],
+  "markers": [
+    {
+      "date": "2026-07-24",
+      "type": "entry",
+      "label": "HSI",
+      "price": 24966.0,
+      "open": true
+    }
+  ],
   "positions": [
     {
       "label": "NQ",
       "venue": "CME",
       "quantity": 1,
       "entry_price": 29203.61,
-      "current_price": 29181.25,
+      "current_price": 28306.5,
       "stop_price": 0.0,
-      "unrealised_pnl": -447.24,
-      "unrealised_pct": -0.08,
+      "unrealised_pnl": -17942.24,
+      "unrealised_pct": -3.07,
       "entry_date": null,
       "holding_days": null,
       "stop_proximity_pct": 0.0,
-      "days_to_expiry": 69,
+      "days_to_expiry": 68,
       "expiry_status": "ok"
     },
     {
@@ -78,14 +90,14 @@
       "venue": "EUREX",
       "quantity": 1,
       "entry_price": 25271.08,
-      "current_price": 25274.0,
+      "current_price": 25172.0,
       "stop_price": 0.0,
-      "unrealised_pnl": 73.0,
-      "unrealised_pct": 0.01,
+      "unrealised_pnl": -2477.0,
+      "unrealised_pct": -0.39,
       "entry_date": null,
       "holding_days": null,
       "stop_proximity_pct": 0.0,
-      "days_to_expiry": 69,
+      "days_to_expiry": 68,
       "expiry_status": "ok"
     },
     {
@@ -93,61 +105,76 @@
       "venue": "CME",
       "quantity": 1,
       "entry_price": 66590.6,
-      "current_price": 66450.0,
+      "current_price": 64355.0,
       "stop_price": 0.0,
-      "unrealised_pnl": -703.01,
-      "unrealised_pct": -0.21,
+      "unrealised_pnl": -11178.01,
+      "unrealised_pct": -3.36,
       "entry_date": null,
       "holding_days": null,
       "stop_proximity_pct": 0.0,
-      "days_to_expiry": 49,
+      "days_to_expiry": 48,
       "expiry_status": "ok"
+    },
+    {
+      "label": "HSI",
+      "venue": "HKFE",
+      "quantity": 1,
+      "entry_price": 24966.0,
+      "current_price": 24966.0,
+      "stop_price": 23717.7,
+      "unrealised_pnl": 0.0,
+      "unrealised_pct": 0.0,
+      "entry_date": "2026-07-24",
+      "holding_days": 0,
+      "stop_proximity_pct": 0.0,
+      "days_to_expiry": 6,
+      "expiry_status": "warning"
     }
   ],
   "signals": [
     {
       "label": "NQ",
-      "price": 29181.25,
-      "ema9": 29301.67,
-      "ema21": 29533.8,
-      "rsi": 40.24,
-      "spread_pct": -0.795,
+      "price": 28306.5,
+      "ema9": 28993.69,
+      "ema21": 29346.47,
+      "rsi": 32.35,
+      "spread_pct": -1.246,
       "state": "long",
-      "days_to_expiry": 69,
+      "days_to_expiry": 68,
       "expiry_status": "ok",
       "inception_date": "2026-07-22"
     },
     {
       "label": "DAX",
-      "price": 25274.0,
-      "ema9": 25140.93,
-      "ema21": 25160.33,
-      "rsi": 40.34,
-      "spread_pct": -0.077,
+      "price": 25172.0,
+      "ema9": 25091.48,
+      "ema21": 25131.17,
+      "rsi": 36.01,
+      "spread_pct": -0.158,
       "state": "long",
-      "days_to_expiry": 69,
+      "days_to_expiry": 68,
       "expiry_status": "ok",
       "inception_date": "2026-07-22"
     },
     {
       "label": "NKD",
-      "price": 66450.0,
-      "ema9": 66942.03,
-      "ema21": 67622.55,
-      "rsi": 39.45,
-      "spread_pct": -1.024,
+      "price": 64355.0,
+      "ema9": 66184.3,
+      "ema21": 67141.51,
+      "rsi": 29.65,
+      "spread_pct": -1.487,
       "state": "long",
-      "days_to_expiry": 49,
+      "days_to_expiry": 48,
       "expiry_status": "ok",
       "inception_date": "2026-07-22"
     },
     {
       "label": "SOXX",
-      "price": 555.37,
-      "ema9": 550.54,
-      "ema21": 563.46,
-      "rsi": 40.6,
-      "spread_pct": -2.328,
+      "price": 527.1,
+      "ema9": 545.93,
+      "ema21": 559.12,
+      "rsi": 37.32,
+      "spread_pct": -2.502,
       "state": "flat",
       "days_to_expiry": null,
       "expiry_status": "none",
@@ -155,13 +182,13 @@
     },
     {
       "label": "HSI",
-      "price": 24916.0,
-      "ema9": 24664.23,
-      "ema21": 24351.38,
-      "rsi": 75.63,
-      "spread_pct": 1.256,
-      "state": "blocked",
-      "days_to_expiry": 7,
+      "price": 24966.0,
+      "ema9": 24811.91,
+      "ema21": 24477.16,
+      "rsi": 69.29,
+      "spread_pct": 1.341,
+      "state": "long",
+      "days_to_expiry": 6,
       "expiry_status": "warning",
       "inception_date": "2026-07-22"
     }
@@ -178,42 +205,42 @@
     "matrix": [
       [
         1.0,
-        0.32,
-        0.905,
-        0.924,
-        0.211
+        0.316,
+        0.907,
+        0.916,
+        0.179
       ],
       [
-        0.32,
+        0.316,
         1.0,
-        0.283,
-        0.303,
-        0.105
+        0.265,
+        0.259,
+        0.097
       ],
       [
-        0.905,
-        0.283,
+        0.907,
+        0.265,
         1.0,
-        0.898,
-        0.139
+        0.901,
+        0.128
       ],
       [
-        0.924,
-        0.303,
-        0.898,
+        0.916,
+        0.259,
+        0.901,
         1.0,
-        0.178
+        0.162
       ],
       [
-        0.211,
-        0.105,
-        0.139,
-        0.178,
+        0.179,
+        0.097,
+        0.128,
+        0.162,
         1.0
       ]
     ],
-    "effective_bets": 2.91,
-    "avg_pairwise": 0.427,
+    "effective_bets": 2.93,
+    "avg_pairwise": 0.413,
     "instrument_count": 5,
     "window_days": 120
   },
@@ -276,10 +303,10 @@
     }
   ],
   "suppression": {
-    "signals_fired": 8,
-    "entries_taken": 0,
+    "signals_fired": 9,
+    "entries_taken": 1,
     "suppressed": 8,
-    "fill_rate": 0.0,
+    "fill_rate": 11.1,
     "by_reason": {
       "rsi_overbought": 8
     },
@@ -492,8 +519,8 @@
   ],
   "last_run": {
     "event": "run",
-    "date": "2026-07-23",
-    "timestamp": "2026-07-23T00:08:23",
+    "date": "2026-07-24",
+    "timestamp": "2026-07-24T23:47:46",
     "status": "ok",
     "instruments_checked": 5,
     "errors": 0
