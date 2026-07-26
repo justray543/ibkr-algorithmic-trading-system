@@ -39,21 +39,45 @@ BASE_URL = DEMO_BASE_URL if USE_DEMO else LIVE_BASE_URL
 # not comparable across instruments. Start tiny on demo and size up only
 # after you have seen the per-epic notional in the position response.
 # ---------------------------------------------------------------------------
+#
+# STATE FILES ARE PREFIXED "capital_" -- this differs from the standalone
+# capital.com-api-trading-system repo, and deliberately so. Here the daemon
+# shares a directory with the IBKR scripts, which write their own
+# <symbol>_position_state.json files. Unprefixed, a Capital.com NVDA CFD and
+# the IBKR NVDA equity position would share nvda_position_state.json: on the
+# first cycle reconcile_state would read the IBKR position, find Capital.com
+# flat, and overwrite that file to flat -- after which the IBKR script would
+# believe it held nothing and could re-buy a position it already has. The
+# prefix keeps the two systems' state disjoint no matter which tickers overlap.
+# ---------------------------------------------------------------------------
 INSTRUMENTS = {
-    "BTC": {"epic": "BTCUSD", "size": 0.005, "state_file": "btc_5min_position_state.json"},
-    "ETH": {"epic": "ETHUSD", "size": 0.10, "state_file": "eth_5min_position_state.json"},
-    "SOL": {"epic": "SOLUSD", "size": 1.00, "state_file": "sol_5min_position_state.json"},
-    "XRP": {"epic": "XRPUSD", "size": 100.0, "state_file": "xrp_5min_position_state.json"},
-    "LTC": {"epic": "LTCUSD", "size": 2.0, "state_file": "ltc_5min_position_state.json"},
-    "BCH": {"epic": "BCHUSD", "size": 0.5, "state_file": "bch_5min_position_state.json"},
+    "BTC": {"epic": "BTCUSD", "size": 0.005, "state_file": "capital_btc_5min_position_state.json"},
+    "ETH": {"epic": "ETHUSD", "size": 0.10, "state_file": "capital_eth_5min_position_state.json"},
+    "SOL": {"epic": "SOLUSD", "size": 1.00, "state_file": "capital_sol_5min_position_state.json"},
+    "XRP": {"epic": "XRPUSD", "size": 100.0, "state_file": "capital_xrp_5min_position_state.json"},
+    "LTC": {"epic": "LTCUSD", "size": 2.0, "state_file": "capital_ltc_5min_position_state.json"},
+    "BCH": {"epic": "BCHUSD", "size": 0.5, "state_file": "capital_bch_5min_position_state.json"},
     # Add/remove instruments freely -- any Capital.com epic works here, sized to
     # taste. BNB is omitted in this example after a live run showed a very high
     # order-rejection rate for it; your account's behavior may differ.
-    "NASDAQ100": {"epic": "US100", "size": 0.005, "state_file": "nasdaq100_position_state.json"},
-    "SP500": {"epic": "US500", "size": 0.02, "state_file": "sp500_position_state.json"},
-    "NIKKEI225": {"epic": "J225", "size": 0.002, "state_file": "nikkei225_position_state.json"},
-    "OIL": {"epic": "OIL_CRUDE", "size": 1.0, "state_file": "oil_position_state.json"},
-    "GOLD": {"epic": "GOLD", "size": 0.025, "state_file": "gold_position_state.json"},
+    "NASDAQ100": {"epic": "US100", "size": 0.005, "state_file": "capital_nasdaq100_position_state.json"},
+    "SP500": {"epic": "US500", "size": 0.02, "state_file": "capital_sp500_position_state.json"},
+    "NIKKEI225": {"epic": "J225", "size": 0.002, "state_file": "capital_nikkei225_position_state.json"},
+    "OIL": {"epic": "OIL_CRUDE", "size": 1.0, "state_file": "capital_oil_position_state.json"},
+    "GOLD": {"epic": "GOLD", "size": 0.025, "state_file": "capital_gold_position_state.json"},
+    "SILVER": {"epic": "SILVER", "size": 1.7, "state_file": "capital_silver_position_state.json"},
+    # Forex majors -- size is in base-currency units, so notional = size * price
+    # directly for EUR/GBP pairs, and size itself for USD-base pairs like USDJPY.
+    "EURUSD": {"epic": "EURUSD", "size": 100.0, "state_file": "capital_eurusd_position_state.json"},
+    "GBPUSD": {"epic": "GBPUSD", "size": 100.0, "state_file": "capital_gbpusd_position_state.json"},
+    "USDJPY": {"epic": "USDJPY", "size": 100.0, "state_file": "capital_usdjpy_position_state.json"},
+    # Blue-chip stocks -- won't trade until NYSE/NASDAQ hours (closed all weekend).
+    # NOTE: the IBKR daily strategy already trades AAPL and NVDA in this same
+    # directory. Enabling them here runs two independent systems on one ticker,
+    # doubling real exposure even though each side's state looks like one position.
+    "AAPL": {"epic": "AAPL", "size": 0.3, "state_file": "capital_aapl_position_state.json"},
+    "TSLA": {"epic": "TSLA", "size": 0.3, "state_file": "capital_tsla_position_state.json"},
+    "NVDA": {"epic": "NVDA", "size": 0.5, "state_file": "capital_nvda_position_state.json"},
 }
 
 # Strategy parameters (mirrors the IBKR setup)

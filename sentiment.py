@@ -37,6 +37,13 @@ KEYWORDS = {
     "NIKKEI225": ["nikkei"],
     "OIL": ["crude oil", "oil price", "opec"],
     "GOLD": ["gold price", "gold "],
+    "SILVER": ["silver price", "silver "],
+    "EURUSD": ["euro", "ecb", "eurozone"],
+    "GBPUSD": ["pound sterling", "gbp", "bank of england"],
+    "USDJPY": ["yen", "boj", "bank of japan"],
+    "AAPL": ["apple inc", "iphone"],
+    "TSLA": ["tesla"],
+    "NVDA": ["nvidia"],
 }
 
 POSITIVE_WORDS = [
