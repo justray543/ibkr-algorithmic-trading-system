@@ -1,5 +1,9 @@
 email_config.py
 telegram_config.py
+capital_config.py
+capital_crypto_trade_log.txt
+strategy_suggestions.json
+session_start.txt
 *_position_state.json
 position_ownership.json
 inception.json
