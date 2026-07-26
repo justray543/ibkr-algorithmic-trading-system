@@ -353,7 +353,26 @@ let S=null;
   renderAll();
   wireTheme();
   reveal();
+  startAutoRefresh();
 })();
+
+/* Auto-refresh: keep the second-by-second freshness ticker running, and poll
+   state.json so an open tab picks up new exports on its own. The render
+   functions aren't safe to re-run in place (some replace or append to their
+   own nodes), so a full reload is the reliable way to adopt new data — it
+   fires only when generated_at actually changes, so a static page never
+   reloads itself, and theme lives in localStorage so it survives the reload. */
+function startAutoRefresh(){
+  setInterval(tickFreshness,1000);
+  setInterval(async()=>{
+    try{
+      const r=await fetch('state.json',{cache:'no-store'});
+      if(!r.ok)return;
+      const next=await r.json();
+      if(next&&next.generated_at&&next.generated_at!==S.generated_at)location.reload();
+    }catch(e){/* transient network error; retry on the next poll */}
+  },60000);
+}
 
 function renderAll(){
   header(); hero(); kpis();
@@ -367,17 +386,34 @@ function renderAll(){
 function header(){
   document.getElementById('modepill').textContent =
     S.mode==='paper' ? 'Paper' : 'Live capital';
-  const last=S.last_run||{};
-  const stamp=new Date(S.generated_at);
-  const ageH=(Date.now()-stamp)/36e5;
+  tickFreshness();
+}
+
+/* Live freshness: re-rendered every second by startAutoRefresh so an open tab
+   always shows how old the data is, counting up between exports rather than
+   freezing at the load-time clock. Flips to a stale style past ~26h. */
+function relTime(ms){
+  const s=Math.max(0,Math.floor(ms/1000));
+  if(s<5)return'just now';
+  if(s<60)return s+'s ago';
+  const m=Math.floor(s/60);
+  if(m<60)return m+(m===1?' min ago':' mins ago');
+  const h=Math.floor(m/60);
+  if(h<24)return h+(h===1?' hr ago':' hrs ago');
+  const d=Math.floor(h/24);
+  return d+(d===1?' day ago':' days ago');
+}
+function tickFreshness(){
+  if(!S)return;
   const f=document.getElementById('freshness');
-  if(ageH>26){
+  if(!f)return;
+  const ageMs=Date.now()-new Date(S.generated_at);
+  if(ageMs/36e5>26){
     f.className='pill';
-    f.innerHTML='<span class="dot stale"></span>Stale, '+Math.floor(ageH)+'h old';
+    f.innerHTML='<span class="dot stale"></span>Stale · updated '+relTime(ageMs);
   }else{
     f.className='pill live';
-    f.innerHTML='<span class="dot"></span>'+
-      stamp.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+' CEST';
+    f.innerHTML='<span class="dot"></span>Updated '+relTime(ageMs);
   }
 }
 
