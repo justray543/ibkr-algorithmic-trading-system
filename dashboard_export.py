@@ -62,10 +62,6 @@ def append_equity_point(nav, cash=None, path=EQUITY_FILE, on_date=None):
     """
     stamp = on_date or datetime.now().strftime("%Y-%m-%d")
 
-    existing = read_equity(path)
-    if existing and existing[-1]["date"] == stamp:
-        return  # already recorded for that date
-
     point = {
         "date": stamp,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -74,9 +70,25 @@ def append_equity_point(nav, cash=None, path=EQUITY_FILE, on_date=None):
     if cash is not None:
         point["cash"] = round(float(cash), 2)
 
-    f = open(path, "a")
-    f.write(json.dumps(point) + "\n")
-    f.close()
+    existing = read_equity(path)
+
+    # One point per calendar day, holding the LATEST nav for that day. A
+    # daily trading run writes it once; an intraday dashboard refresh
+    # overwrites the same day's point with a fresher nav rather than either
+    # skipping (which would freeze the curve at the first reading of the
+    # day) or appending (which would put 30 points on one date). The file
+    # is rewritten only when today's point already exists, so the common
+    # append path stays append-only.
+    if existing and existing[-1]["date"] == stamp:
+        existing[-1] = point
+        f = open(path, "w")
+        for pt in existing:
+            f.write(json.dumps(pt) + "\n")
+        f.close()
+    else:
+        f = open(path, "a")
+        f.write(json.dumps(point) + "\n")
+        f.close()
 
 
 def read_equity(path=EQUITY_FILE):

@@ -116,7 +116,7 @@ if __name__ == "__main__":
 
     nq_contract = future("NQ", "CME", "202609", currency="USD")
 
-history = fetch_with_retry(app, 106000, nq_contract, "TRADES", "2 M", "5 mins")
+    history = fetch_with_retry(app, 106000, nq_contract, "TRADES", "2 M", "5 mins")
 
     if not history.empty:
         print("NQ: " + str(len(history)) + " rows, from " + str(history.index.min()) + " to " + str(history.index.max()))

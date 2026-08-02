@@ -11,9 +11,11 @@ from wrapper import IBWrapper
 from client import IBClient
 from contract import stock
 from order import market, BUY, SELL
-from position_sizing import calculate_position_size
+from position_sizing import calculate_risk_based_size, describe_size
 from email_config import GMAIL_ADDRESS, GMAIL_APP_PASSWORD, RECIPIENT_EMAIL
 from telegram_config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+
+import beta
 
 LOG_FILE = "daily_trade_log.txt"
 
@@ -21,11 +23,27 @@ RSI_ENTRY_MIN = 50
 RSI_ENTRY_MAX = 70
 RSI_EXIT_THRESHOLD = 40
 
-POSITION_SIZE_PCT = 0.01
+STOP_LOSS_PCT = 0.05
+
+# Risk control. RISK_PER_TRADE_PCT is what a stop-out costs the account, not
+# what the position is worth -- see position_sizing.py for why those are not
+# the same number. MAX_NOTIONAL_PCT caps gross exposure independently, so a
+# tight stop cannot talk the risk model into an enormous position.
+RISK_PER_TRADE_PCT = 0.01
+MAX_NOTIONAL_PCT = 0.20
 MAX_QTY_STOCK = 100
+
+# Benchmark for beta. SPY is not in the traded universe; it is fetched once per
+# run purely as the regression reference.
+BENCHMARK_SYMBOL = "SPY"
 
 summary_lines = []
 action_summary = []
+
+# Collected during the instrument loop, handed to beta.write_watchlist at the
+# end. benchmark_closes is populated once before the loop.
+beta_rows = []
+benchmark_closes = None
 
 
 def build_instruments():
@@ -316,6 +334,16 @@ def process_instrument(app, label, config, request_id, real_positions, open_orde
     stop_price = state["stop_price"]
     held_quantity = state.get("quantity", 0)
 
+    # Score this name for the high-beta short watchlist. Flagging only -- no
+    # order is ever placed from this, and beta.py cannot place one.
+    if benchmark_closes is not None:
+        try:
+            beta_rows.append(beta.evaluate(
+                label, history["close"], benchmark_closes,
+                ema9, ema21, rsi, current_price))
+        except Exception as e:
+            log(label + ": beta scoring failed - " + str(e))
+
     entry_signal = ema9 > ema21 and rsi > RSI_ENTRY_MIN and rsi < RSI_ENTRY_MAX
     exit_signal = ema9 < ema21 or rsi < RSI_EXIT_THRESHOLD
     stop_hit = position == 1 and current_price <= stop_price
@@ -323,19 +351,38 @@ def process_instrument(app, label, config, request_id, real_positions, open_orde
     if position == 0 and entry_signal:
         account_values = app.get_account_values()
         net_liq = account_values.get("NetLiquidation", (0.0, "USD"))[0]
-        dynamic_qty = calculate_position_size(
-            net_liq, current_price, POSITION_SIZE_PCT,
-            multiplier=multiplier, max_qty=MAX_QTY_STOCK
+
+        # Stop first, size second. The stop distance IS the risk denominator,
+        # so it has to exist before a quantity can be computed at all.
+        new_stop = current_price * (1 - STOP_LOSS_PCT)
+        dynamic_qty = calculate_risk_based_size(
+            net_liq, current_price, new_stop,
+            risk_pct=RISK_PER_TRADE_PCT, multiplier=multiplier,
+            max_notional_pct=MAX_NOTIONAL_PCT, max_qty=MAX_QTY_STOCK
         )
-        log(label + ": ENTRY SIGNAL. Net Liq=$" + str(round(net_liq, 2)) + " -> sizing to " + str(dynamic_qty) + " shares. Placing BUY.")
+
+        if dynamic_qty <= 0:
+            # Zero is a decision, not a rounding error: the account cannot
+            # carry this position inside the risk budget. Skipping is correct.
+            log(label + ": ENTRY SIGNAL but risk-based size is 0 "
+                "(NetLiq=" + str(round(net_liq, 2)) + ", stop distance "
+                + str(round(current_price - new_stop, 4)) + "). Skipping entry.")
+            action_summary.append((label, "HOLD (entry signal, but 0 size within risk budget)"))
+            return
+
+        sizing = describe_size(net_liq, current_price, new_stop, dynamic_qty, multiplier)
+        log(label + ": ENTRY SIGNAL. NetLiq=" + str(round(net_liq, 2))
+            + " -> " + str(dynamic_qty) + " shares"
+            + " | risk " + str(sizing["risk_amount"]) + " (" + str(sizing["risk_pct"]) + "% of NAV)"
+            + " | notional " + str(sizing["notional"]) + " (" + str(sizing["notional_pct"]) + "%)")
         order = market(BUY, dynamic_qty)
         order_id = app.send_order(contract, order)
         log(label + ": order sent (id=" + str(order_id) + "). Waiting to confirm fill...")
         time.sleep(5)
         log(label + ": check TWS Trades tab to confirm this order actually filled.")
-        new_stop = current_price * 0.95
         save_state(state_file, 1, current_price, new_stop, dynamic_qty, False)
-        action_summary.append((label, "BUY (new position, " + str(dynamic_qty) + " shares, price " + price_str + ")"))
+        action_summary.append((label, "BUY (" + str(dynamic_qty) + " shares @ " + price_str
+                               + ", risking " + str(sizing["risk_pct"]) + "% of NAV)"))
 
     elif position == 0 and ema9 > ema21 and rsi >= RSI_ENTRY_MAX:
         log(label + ": signal fired but RSI is overbought. Skipping entry.")
@@ -388,6 +435,20 @@ if __name__ == "__main__":
     open_orders = app.get_open_orders()
     log("Pending open orders: " + str(list(open_orders.keys())))
 
+    # Benchmark for beta, fetched once. A failure here disables beta scoring
+    # for the run but must never stop trading -- the watchlist is an
+    # observation layer, not a precondition for the strategy.
+    try:
+        bench_contract = stock(BENCHMARK_SYMBOL, "SMART", "USD", primary_exchange="ARCA")
+        bench_hist = app.get_historical_data(79999, bench_contract, "60 D", "1 day", "MIDPOINT")
+        if not bench_hist.empty and len(bench_hist) >= 25:
+            benchmark_closes = bench_hist["close"]
+            log("Benchmark " + BENCHMARK_SYMBOL + ": " + str(len(bench_hist)) + " bars for beta.")
+        else:
+            log("Benchmark " + BENCHMARK_SYMBOL + ": insufficient data, beta scoring disabled this run.")
+    except Exception as e:
+        log("Benchmark fetch failed (" + str(e) + "), beta scoring disabled this run.")
+
     instruments = build_instruments()
 
     i = 0
@@ -402,6 +463,21 @@ if __name__ == "__main__":
         time.sleep(3)
 
     log("=== DAILY signal check complete ===")
+
+    # High-beta short watchlist. Written after the loop so it reflects this
+    # run's signals. Flag only -- nothing here places an order.
+    if beta_rows:
+        try:
+            payload = beta.write_watchlist(beta_rows, BENCHMARK_SYMBOL)
+            log("Short watchlist: " + str(payload["flagged_count"]) + " of "
+                + str(payload["universe_count"]) + " names flagged -> " + beta.WATCHLIST_FILE)
+            for line in beta.summary_lines(payload):
+                log(line)
+        except Exception as e:
+            log("Short watchlist write failed: " + str(e))
+    else:
+        log("Short watchlist: no instruments scored this run.")
+
     app.disconnect()
 
     if has_notable_action():
