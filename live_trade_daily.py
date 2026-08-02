@@ -16,6 +16,12 @@ from email_config import GMAIL_ADDRESS, GMAIL_APP_PASSWORD, RECIPIENT_EMAIL
 from telegram_config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
 import beta
+import trade_ledger as ledger
+
+# Tags every ledger event this script writes. SOXX is in both this universe and
+# live_trade.py's, so without the tag the two strategies' entries and exits
+# would pair with each other.
+STRATEGY = "daily_equities"
 
 LOG_FILE = "daily_trade_log.txt"
 
@@ -44,6 +50,12 @@ action_summary = []
 # end. benchmark_closes is populated once before the loop.
 beta_rows = []
 benchmark_closes = None
+
+# Instruments that returned no usable bars this run. If this ends up covering
+# the whole universe the run did not "succeed with warnings" -- it saw nothing,
+# which is what a logged-out TWS looks like from in here. Recording that as
+# status "ok" is how an eight-day data blackout went unnoticed in July.
+no_data_labels = []
 
 
 def build_instruments():
@@ -312,6 +324,8 @@ def process_instrument(app, label, config, request_id, real_positions, open_orde
 
     if history.empty or len(history) < min_rows_required:
         log(label + ": ERROR insufficient data (" + str(len(history)) + " rows, need " + str(min_rows_required) + "). Skipping.")
+        ledger.record_health("warning", label, "insufficient data, skipped")
+        no_data_labels.append(label)
         action_summary.append((label, "ERROR - no data"))
         return
 
@@ -367,6 +381,8 @@ def process_instrument(app, label, config, request_id, real_positions, open_orde
             log(label + ": ENTRY SIGNAL but risk-based size is 0 "
                 "(NetLiq=" + str(round(net_liq, 2)) + ", stop distance "
                 + str(round(current_price - new_stop, 4)) + "). Skipping entry.")
+            ledger.record_suppressed(label, current_price, rsi, ema9, ema21,
+                                     "zero_risk_size", strategy=STRATEGY)
             action_summary.append((label, "HOLD (entry signal, but 0 size within risk budget)"))
             return
 
@@ -381,11 +397,16 @@ def process_instrument(app, label, config, request_id, real_positions, open_orde
         time.sleep(5)
         log(label + ": check TWS Trades tab to confirm this order actually filled.")
         save_state(state_file, 1, current_price, new_stop, dynamic_qty, False)
+        ledger.record_entry(label, current_price, dynamic_qty, new_stop,
+                            order_id=order_id, rsi=rsi, ema9=ema9, ema21=ema21,
+                            strategy=STRATEGY)
         action_summary.append((label, "BUY (" + str(dynamic_qty) + " shares @ " + price_str
                                + ", risking " + str(sizing["risk_pct"]) + "% of NAV)"))
 
     elif position == 0 and ema9 > ema21 and rsi >= RSI_ENTRY_MAX:
         log(label + ": signal fired but RSI is overbought. Skipping entry.")
+        ledger.record_suppressed(label, current_price, rsi, ema9, ema21,
+                                 "rsi_overbought", strategy=STRATEGY)
         action_summary.append((label, "HOLD (flat, overbought - skipped entry)"))
 
     elif position == 1 and is_manual:
@@ -400,6 +421,9 @@ def process_instrument(app, label, config, request_id, real_positions, open_orde
         log(label + ": close order sent (id=" + str(order_id) + ")")
         time.sleep(5)
         save_state(state_file, 0, 0.0, 0.0, 0, False)
+        ledger.record_exit(label, current_price, held_quantity, "stop",
+                           order_id=order_id, rsi=rsi, ema9=ema9, ema21=ema21,
+                           strategy=STRATEGY)
         action_summary.append((label, "SELL (stop-loss hit, price " + price_str + ")"))
 
     elif position == 1 and exit_signal:
@@ -409,6 +433,10 @@ def process_instrument(app, label, config, request_id, real_positions, open_orde
         log(label + ": close order sent (id=" + str(order_id) + ")")
         time.sleep(5)
         save_state(state_file, 0, 0.0, 0.0, 0, False)
+        ledger.record_exit(label, current_price, held_quantity,
+                           "rsi_exit" if rsi < RSI_EXIT_THRESHOLD else "crossover",
+                           order_id=order_id, rsi=rsi, ema9=ema9, ema21=ema21,
+                           strategy=STRATEGY)
         action_summary.append((label, "SELL (trend exit, price " + price_str + ")"))
 
     elif position == 1:
@@ -463,6 +491,25 @@ if __name__ == "__main__":
         time.sleep(3)
 
     log("=== DAILY signal check complete ===")
+
+    # Report what the run actually saw, not merely that it finished. A run in
+    # which every instrument was skipped for want of data is a failed run, and
+    # it must not be indistinguishable from a quiet but healthy one.
+    checked = len(instruments)
+    blind = len(no_data_labels)
+    if blind >= checked and checked > 0:
+        run_status = "no_data"
+        msg = ("no market data for ANY of " + str(checked) + " instruments - "
+               "TWS is almost certainly logged out or the API is disabled")
+        log("RUN STATUS: no_data - " + msg)
+        ledger.record_health("error", "SYSTEM", msg)
+        action_summary.append(("SYSTEM", "ERROR - " + msg))
+    elif blind > 0:
+        run_status = "degraded"
+        log("RUN STATUS: degraded - no data for " + ", ".join(no_data_labels))
+    else:
+        run_status = "ok"
+    ledger.record_run(run_status, checked, errors=blind)
 
     # High-beta short watchlist. Written after the loop so it reflects this
     # run's signals. Flag only -- nothing here places an order.

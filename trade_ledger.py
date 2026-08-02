@@ -81,12 +81,20 @@ def _append(event, path=LEDGER_FILE):
 
 def record_entry(label, price, quantity, stop_price, order_id=None,
                  rsi=None, ema9=None, ema21=None, path=LEDGER_FILE,
-                 on_date=None):
-    """on_date ('YYYY-MM-DD') backdates the record. Live runs omit it."""
+                 on_date=None, strategy=None):
+    """
+    on_date ('YYYY-MM-DD') backdates the record. Live runs omit it.
+
+    strategy tags which script opened this position. Two strategies can trade
+    the same symbol -- SOXX is in both the futures and the equities universe --
+    and without the tag build_closed_trades pairs one strategy's entry with the
+    other's exit, inventing round trips that never happened.
+    """
     now = datetime.now()
     event = {
         "event": "entry",
         "label": label,
+        "strategy": strategy,
         "date": on_date or now.strftime("%Y-%m-%d"),
         "timestamp": now.isoformat(timespec="seconds"),
         "price": round(float(price), 4),
@@ -103,7 +111,7 @@ def record_entry(label, price, quantity, stop_price, order_id=None,
 
 def record_exit(label, price, quantity, reason, order_id=None,
                 rsi=None, ema9=None, ema21=None, path=LEDGER_FILE,
-                on_date=None):
+                on_date=None, strategy=None):
     """
     reason should be one of: 'stop', 'crossover', 'rsi_exit', 'manual', 'roll'
     Kept as a controlled vocabulary so the exit-reason breakdown on the
@@ -113,6 +121,7 @@ def record_exit(label, price, quantity, reason, order_id=None,
     event = {
         "event": "exit",
         "label": label,
+        "strategy": strategy,
         "date": on_date or now.strftime("%Y-%m-%d"),
         "timestamp": now.isoformat(timespec="seconds"),
         "price": round(float(price), 4),
@@ -128,7 +137,7 @@ def record_exit(label, price, quantity, reason, order_id=None,
 
 
 def record_suppressed(label, price, rsi, ema9, ema21, reason, path=LEDGER_FILE,
-                      on_date=None):
+                      on_date=None, strategy=None):
     """
     A crossover fired but the entry was vetoed.
 
@@ -141,6 +150,7 @@ def record_suppressed(label, price, rsi, ema9, ema21, reason, path=LEDGER_FILE,
     event = {
         "event": "suppressed",
         "label": label,
+        "strategy": strategy,
         "date": on_date or now.strftime("%Y-%m-%d"),
         "timestamp": now.isoformat(timespec="seconds"),
         "price": round(float(price), 4),
@@ -227,13 +237,15 @@ def build_closed_trades(multipliers=None, path=LEDGER_FILE):
     open_positions = {}
     trades = []
 
+    # Key on (strategy, label). Events written before the strategy tag existed
+    # carry None, so they keep pairing among themselves exactly as before.
     for e in events:
         if e.get("event") == "entry":
-            open_positions[e["label"]] = e
+            open_positions[(e.get("strategy"), e["label"])] = e
 
         elif e.get("event") == "exit":
             label = e["label"]
-            entry = open_positions.pop(label, None)
+            entry = open_positions.pop((e.get("strategy"), label), None)
             if entry is None:
                 continue
 
