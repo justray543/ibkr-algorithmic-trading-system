@@ -1,17 +1,17 @@
 {
-  "generated_at": "2026-07-26T00:56:46",
+  "generated_at": "2026-08-02T21:34:18",
   "mode": "paper",
   "currency": "USD",
   "inception": {
     "date": "2026-07-20",
     "starting_capital": 1000000.0,
-    "days_live": 6
+    "days_live": 13
   },
   "performance": {
-    "nav": 979982.33,
-    "return_pct": -2.0,
-    "pnl_abs": -20017.67,
-    "history_points": 4,
+    "nav": 983658.8,
+    "return_pct": -1.63,
+    "pnl_abs": -16341.2,
+    "history_points": 5,
     "max_drawdown_pct": -3.95,
     "sharpe": null,
     "sortino": null,
@@ -24,25 +24,29 @@
       "2026-07-22",
       "2026-07-23",
       "2026-07-24",
-      "2026-07-26"
+      "2026-07-26",
+      "2026-08-02"
     ],
     "strategy": [
       1020309.34,
       1016667.12,
       980176.77,
-      979982.33
+      979982.33,
+      983658.8
     ],
     "benchmark": [
-      979479.52,
-      991037.03,
-      981445.08,
-      981445.08
+      1032520.75,
+      1024329.42,
+      1003214.04,
+      1003214.04,
+      1003214.04
     ],
     "drawdown": [
       0.0,
       -0.357,
       -3.933,
-      -3.952
+      -3.952,
+      -3.592
     ]
   },
   "drawdown_detail": {
@@ -52,9 +56,9 @@
     "recovery_date": null,
     "is_recovered": false,
     "decline_days": 4,
-    "recovery_days": 0,
-    "longest_underwater_days": 3,
-    "currently_underwater_pct": -3.95
+    "recovery_days": 7,
+    "longest_underwater_days": 4,
+    "currently_underwater_pct": -3.59
   },
   "rolling": {
     "sharpe": {
@@ -79,14 +83,14 @@
       "venue": "CME",
       "quantity": 1,
       "entry_price": 29203.61,
-      "current_price": 28282.25,
+      "current_price": 28404.25,
       "stop_price": 0.0,
-      "unrealised_pnl": -18427.24,
-      "unrealised_pct": -3.15,
+      "unrealised_pnl": -15987.24,
+      "unrealised_pct": -2.74,
       "entry_date": null,
       "holding_days": null,
       "stop_proximity_pct": 0.0,
-      "days_to_expiry": 66,
+      "days_to_expiry": 59,
       "expiry_status": "ok"
     },
     {
@@ -94,14 +98,14 @@
       "venue": "EUREX",
       "quantity": 1,
       "entry_price": 25271.08,
-      "current_price": 25181.0,
+      "current_price": 25710.0,
       "stop_price": 0.0,
-      "unrealised_pnl": -2252.0,
-      "unrealised_pct": -0.36,
+      "unrealised_pnl": 10973.0,
+      "unrealised_pct": 1.74,
       "entry_date": null,
       "holding_days": null,
       "stop_proximity_pct": 0.0,
-      "days_to_expiry": 66,
+      "days_to_expiry": 59,
       "expiry_status": "ok"
     },
     {
@@ -109,14 +113,14 @@
       "venue": "CME",
       "quantity": 1,
       "entry_price": 66590.6,
-      "current_price": 64440.0,
+      "current_price": 63330.0,
       "stop_price": 0.0,
-      "unrealised_pnl": -10753.01,
-      "unrealised_pct": -3.23,
+      "unrealised_pnl": -16303.01,
+      "unrealised_pct": -4.9,
       "entry_date": null,
       "holding_days": null,
       "stop_proximity_pct": 0.0,
-      "days_to_expiry": 46,
+      "days_to_expiry": 39,
       "expiry_status": "ok"
     },
     {
@@ -124,61 +128,61 @@
       "venue": "HKFE",
       "quantity": 1,
       "entry_price": 24966.0,
-      "current_price": 24966.0,
+      "current_price": 25818.0,
       "stop_price": 23717.7,
-      "unrealised_pnl": 0.0,
-      "unrealised_pct": 0.0,
+      "unrealised_pnl": 42600.0,
+      "unrealised_pct": 3.41,
       "entry_date": "2026-07-24",
-      "holding_days": 2,
+      "holding_days": 9,
       "stop_proximity_pct": 0.0,
-      "days_to_expiry": 4,
-      "expiry_status": "warning"
+      "days_to_expiry": -3,
+      "expiry_status": "expired"
     }
   ],
   "signals": [
     {
       "label": "NQ",
-      "price": 28282.25,
-      "ema9": 28988.84,
-      "ema21": 29344.26,
-      "rsi": 32.18,
-      "spread_pct": -1.257,
+      "price": 28404.25,
+      "ema9": 28366.27,
+      "ema21": 28852.16,
+      "rsi": 39.09,
+      "spread_pct": -1.711,
       "state": "long",
-      "days_to_expiry": 66,
+      "days_to_expiry": 59,
       "expiry_status": "ok",
       "inception_date": "2026-07-22"
     },
     {
       "label": "DAX",
-      "price": 25181.0,
-      "ema9": 25093.28,
-      "ema21": 25131.99,
-      "rsi": 36.21,
-      "spread_pct": -0.154,
+      "price": 25710.0,
+      "ema9": 25448.55,
+      "ema21": 25313.52,
+      "rsi": 61.47,
+      "spread_pct": 0.525,
       "state": "long",
-      "days_to_expiry": 66,
+      "days_to_expiry": 59,
       "expiry_status": "ok",
       "inception_date": "2026-07-22"
     },
     {
       "label": "NKD",
-      "price": 64440.0,
-      "ema9": 66201.3,
-      "ema21": 67149.23,
-      "rsi": 29.83,
-      "spread_pct": -1.471,
+      "price": 63330.0,
+      "ema9": 64074.21,
+      "ema21": 65595.1,
+      "rsi": 36.04,
+      "spread_pct": -2.402,
       "state": "long",
-      "days_to_expiry": 46,
+      "days_to_expiry": 39,
       "expiry_status": "ok",
       "inception_date": "2026-07-22"
     },
     {
       "label": "SOXX",
-      "price": 527.1,
-      "ema9": 545.93,
-      "ema21": 559.12,
-      "rsi": 37.32,
-      "spread_pct": -2.502,
+      "price": 504.17,
+      "ema9": 512.51,
+      "ema21": 535.36,
+      "rsi": 39.35,
+      "spread_pct": -4.533,
       "state": "flat",
       "days_to_expiry": null,
       "expiry_status": "none",
@@ -186,14 +190,14 @@
     },
     {
       "label": "HSI",
-      "price": 24966.0,
-      "ema9": 24811.91,
-      "ema21": 24477.16,
-      "rsi": 69.29,
-      "spread_pct": 1.341,
+      "price": 25818.0,
+      "ema9": 25277.38,
+      "ema21": 24823.87,
+      "rsi": 72.65,
+      "spread_pct": 1.757,
       "state": "long",
-      "days_to_expiry": 4,
-      "expiry_status": "warning",
+      "days_to_expiry": -3,
+      "expiry_status": "expired",
       "inception_date": "2026-07-22"
     }
   ],
@@ -209,42 +213,42 @@
     "matrix": [
       [
         1.0,
-        0.314,
+        0.316,
+        0.912,
+        0.919,
+        0.138
+      ],
+      [
+        0.316,
+        1.0,
+        0.256,
+        0.226,
+        0.099
+      ],
+      [
+        0.912,
+        0.256,
+        1.0,
         0.908,
-        0.917,
-        0.18
+        0.09
       ],
       [
-        0.314,
-        1.0,
-        0.266,
-        0.258,
-        0.096
-      ],
-      [
+        0.919,
+        0.226,
         0.908,
-        0.266,
         1.0,
-        0.9,
-        0.127
+        0.114
       ],
       [
-        0.917,
-        0.258,
-        0.9,
-        1.0,
-        0.162
-      ],
-      [
-        0.18,
-        0.096,
-        0.127,
-        0.162,
+        0.138,
+        0.099,
+        0.09,
+        0.114,
         1.0
       ]
     ],
     "effective_bets": 2.93,
-    "avg_pairwise": 0.413,
+    "avg_pairwise": 0.398,
     "instrument_count": 5,
     "window_days": 120
   },
@@ -523,8 +527,8 @@
   ],
   "last_run": {
     "event": "run",
-    "date": "2026-07-26",
-    "timestamp": "2026-07-26T00:56:45",
+    "date": "2026-08-02",
+    "timestamp": "2026-08-02T21:34:18",
     "status": "refresh",
     "instruments_checked": 5,
     "errors": 0
