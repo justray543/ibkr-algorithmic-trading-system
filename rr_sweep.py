@@ -432,6 +432,9 @@ def main():
     src.add_argument("--csv", help="CSV with a date index and a close column")
     src.add_argument("--tws", action="store_true",
                      help="pull 1Y daily bars for the equity universe from TWS")
+    src.add_argument("--capital", nargs="*", metavar="PAIR",
+                     help="pull daily bars from Capital.com (default: EURUSD USDJPY "
+                          "EURJPY GBPJPY GBPUSD). Needs capital_config.py.")
     ap.add_argument("--volume", action="store_true",
                     help="also A/B the volume-pressure filter (needs TRADES bars)")
     ap.add_argument("--cost", type=float, default=0.001, help="per-side transaction cost")
@@ -440,13 +443,37 @@ def main():
     if args.selftest:
         return selftest()
 
-    data = load_csv(args.csv) if args.csv else load_from_tws()
+    if args.capital is not None:
+        import capital_prices
+        pairs = args.capital or ["EURUSD", "USDJPY", "EURJPY", "GBPJPY", "GBPUSD"]
+        print("Fetching daily bars from Capital.com (demo)...")
+        data = capital_prices.fetch(pairs, resolution="DAY", bars=800)
+    elif args.csv:
+        data = load_csv(args.csv)
+    else:
+        data = load_from_tws()
     if not data:
         print("No usable price data.")
         return 1
 
     results = sweep(data, transaction_cost=args.cost)
     report(results, find_sweet_spot(results))
+
+    if args.capital is not None and not results.empty:
+        import capital_prices
+        sweet = find_sweet_spot(results)
+        print("\n" + "=" * 96)
+        print("UNMODELLED COST: overnight financing")
+        print("  These are CFDs. Every night a position is held pays or receives a swap,")
+        print("  and the backtest above charges only a flat per-side transaction cost.")
+        for hold in (3, 10, 30):
+            drag = capital_prices.estimate_financing_drag(hold)
+            print(f"    a {hold:>2}-day hold costs roughly {drag:.3f}% of notional in financing")
+        if sweet:
+            print(f"  Measured expectancy at the sweet spot: {sweet['expectancy_pct']:+.3f}% per trade.")
+            print("  If the drag for your typical holding period is the same order of magnitude,")
+            print("  this backtest has measured a gross number against a cost it did not include.")
+        print("  Rates are per-instrument and change daily; JPY crosses are carry-sensitive.")
 
     if args.volume:
         print("\n\nVolume-pressure filter A/B  (identical strategy, gate on/off)")

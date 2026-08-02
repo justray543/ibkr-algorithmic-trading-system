@@ -1,0 +1,6 @@
+# Upstream capital.com-api-trading-system pins requests + pandas; this repo
+# additionally needs numpy for the analytics and ibapi for the IBKR path.
+pandas
+numpy
+requests
+ibapi
