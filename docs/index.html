@@ -123,7 +123,10 @@ tr:last-child td{border-bottom:none}
 .azero{position:absolute;top:0;bottom:0;width:1px;background:var(--zero)}
 
 .corrwrap{overflow-x:auto}
-.corr{border-collapse:collapse;font-size:10px;min-width:auto}
+/* The generic `table{width:100%}` rule applied here too, stretching the empty
+   corner cell until the whole grid was shoved against the right edge of the
+   card. The matrix should size to its own content and sit at the left. */
+.corr{border-collapse:collapse;font-size:10px;min-width:auto;width:auto;margin-right:auto}
 .corr td,.corr th{padding:0;border:none;white-space:nowrap}
 .corr th{font-size:9px;letter-spacing:.04em;color:var(--muted);font-weight:500;text-transform:none}
 .corr th.rowh{text-align:right;padding-right:8px}
@@ -582,7 +585,9 @@ function positions(){
   S.positions.forEach(p=>{
     const hot=p.stop_proximity_pct>60?'hot':'';
     let exp='<span style="color:var(--muted)">\u2013</span>';
-    if(p.days_to_expiry!=null){
+    if(p.expiry_status==='expired'){
+      exp=`<span class="tag crit">EXPIRED ${Math.abs(p.days_to_expiry)}d</span>`;
+    }else if(p.days_to_expiry!=null){
       const st=p.expiry_status;
       const cls=st==='critical'?'tag crit':st==='warning'?'tag warn':'tag';
       exp=`<span class="${cls}">${p.days_to_expiry}d</span>`;
@@ -612,7 +617,12 @@ function signals(){
       :s.state==='blocked'?'<span class="tag" style="border-color:var(--blockBorder);color:var(--loss)">Filtered</span>'
       :'<span class="tag">Flat</span>';
     let expNote='';
-    if(s.days_to_expiry!=null&&s.expiry_status!=='ok'){
+    if(s.expiry_status==='expired'){
+      /* Past the last trading date. "Roll in -3d" is not a countdown, it is a
+         dead contract still being quoted -- and it is why the health feed
+         reports insufficient data for this instrument. Say so plainly. */
+      expNote=`<span class="dn">EXPIRED ${Math.abs(s.days_to_expiry)}d ago — roll now</span>`;
+    }else if(s.days_to_expiry!=null&&s.expiry_status!=='ok'){
       expNote=`<span class="${s.expiry_status==='critical'?'dn':'wn'}">Roll in ${s.days_to_expiry}d</span>`;
     }else if(s.inception_date){
       expNote='<span>Since '+shortDate(s.inception_date)+'</span>';
@@ -743,11 +753,15 @@ function drawDurations(){
     lbl+=`<text x="${x+w/2}" y="${H-24}" text-anchor="middle" font-size="11" fill="${C('--axis')}" font-family="Space Grotesk,sans-serif">${b.bucket}</text>`;
     lbl+=`<text x="${x+w/2}" y="${H-9}" text-anchor="middle" font-size="10" fill="${C('--axis')}" font-family="JetBrains Mono,monospace">${b.total?money(b.avg_pnl).replace(/\.\d+$/,''):''}</text>`;
   });
+  /* Trade counts are integers, so the axis must be too. Four evenly spaced
+     ticks across a max of 1 rounded to "1,1,0,0" -- two duplicate labels on a
+     two-value axis. Step by whole trades and never draw the same label twice. */
   let grid='';
-  for(let k=0;k<=3;k++){
-    const v=max*k/3;
+  const ticks=Math.min(3,Math.max(1,max));
+  const step=Math.max(1,Math.ceil(max/ticks));
+  for(let v=0;v<=max;v+=step){
     grid+=`<line x1="${P.l}" y1="${Y(v)}" x2="${W-P.r}" y2="${Y(v)}" stroke="${C('--gridline')}"/>`;
-    grid+=`<text x="${P.l-10}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="${C('--axis')}" font-family="JetBrains Mono,monospace">${Math.round(v)}</text>`;
+    grid+=`<text x="${P.l-10}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="${C('--axis')}" font-family="JetBrains Mono,monospace">${v}</text>`;
   }
   document.getElementById('durations').innerHTML=
     `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Holding period distribution">${grid}${bars}${lbl}</svg>`;
@@ -755,14 +769,28 @@ function drawDurations(){
 
 function tradeStats(){
   const t=S.trade_stats;
-  document.getElementById('tradestat').innerHTML=[
-    ['Closed trades',t.count,''],
-    ['Avg holding',t.avg_holding_days+'d',''],
-    ['Avg win',money(t.avg_win),'up'],
-    ['Avg loss',money(-t.avg_loss),'dn'],
-    ['Profit factor',t.profit_factor??'\u221E',t.profit_factor>=1?'up':'dn'],
-    ['Expectancy',money(t.expectancy),dir(t.expectancy)]
-  ].map(r=>`<div><div class="k">${r[0]}</div><div class="v mono ${r[2]}">${r[1]}</div></div>`).join('');
+  const DASH='\u2013';
+  /* With no closed trades every one of these is 0, and formatting 0 through
+     money()/dir() produced "+0.00" in green for Avg loss and a red "0" for
+     profit factor -- an empty ledger rendered as a losing strategy. Show a
+     dash instead, the same way the KPI strip already does for Sharpe. */
+  const none=!t.count;
+  const rows = none
+    ? [['Closed trades',0,''],['Avg holding',DASH,''],['Avg win',DASH,''],
+       ['Avg loss',DASH,''],['Profit factor',DASH,''],['Expectancy',DASH,'']]
+    : [
+        ['Closed trades',t.count,''],
+        ['Avg holding',t.avg_holding_days+'d',''],
+        ['Avg win',money(t.avg_win),'up'],
+        ['Avg loss',money(-t.avg_loss),'dn'],
+        /* profit_factor is null when there are no losing trades, i.e. infinite.
+           `null >= 1` is false, so this used to paint an unbeaten record red. */
+        ['Profit factor', t.profit_factor==null?'\u221E':t.profit_factor,
+         t.profit_factor==null||t.profit_factor>=1?'up':'dn'],
+        ['Expectancy',money(t.expectancy),dir(t.expectancy)]
+      ];
+  document.getElementById('tradestat').innerHTML=rows
+    .map(r=>`<div><div class="k">${r[0]}</div><div class="v mono ${r[2]}">${r[1]}</div></div>`).join('');
 }
 
 /* ---------- suppression ---------- */
@@ -774,10 +802,22 @@ function funnel(){
      <div class="mono" style="font-size:32px;letter-spacing:-.03em;margin-top:6px">${s.signals_fired}</div>
      <div class="fbar"><i class="ftaken" style="width:${taken}%"></i><i class="fsupp" style="width:${supp}%"></i></div>
      <div class="fleg"><span class="mono">${s.entries_taken} taken \u00B7 ${s.fill_rate}%</span><span class="mono">${s.suppressed} vetoed</span></div>
-     <div class="note" style="margin-top:14px">${
-       s.fill_rate<55
-       ? 'The confirmation filter is vetoing nearly half of all signals. Worth testing whether it adds return or only removes trades.'
-       : 'The confirmation filter is vetoing a minority of signals.'}</div>`;
+     <div class="note" style="margin-top:14px">${vetoVerdict(s)}</div>`;
+}
+
+/* The wording has to track the actual veto rate. A single "<55%" branch
+   described 11% and 54% with the same sentence -- "nearly half" -- which read
+   as reassuring while the filter was rejecting nine signals in ten. */
+function vetoVerdict(s){
+  if(!s.signals_fired) return 'No signals fired yet.';
+  const vetoPct=100-s.fill_rate;
+  if(vetoPct>=80)
+    return `The confirmation filter is vetoing ${vetoPct.toFixed(0)}% of all signals — the strategy is barely trading. Whatever edge the entry rule has, this filter is where almost all of it is being discarded. Worth ablating in the backtest.`;
+  if(vetoPct>=55)
+    return `The confirmation filter is vetoing ${vetoPct.toFixed(0)}% of signals, a clear majority. Worth testing whether it adds return or only removes trades.`;
+  if(vetoPct>=35)
+    return `The confirmation filter is vetoing roughly ${vetoPct.toFixed(0)}% of signals. Worth testing whether it adds return or only removes trades.`;
+  return `The confirmation filter is vetoing ${vetoPct.toFixed(0)}% of signals, a minority.`;
 }
 function suppTable(){
   const t=document.getElementById('supptable');
