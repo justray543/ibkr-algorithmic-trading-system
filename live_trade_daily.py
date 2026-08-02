@@ -316,7 +316,12 @@ def process_instrument(app, label, config, request_id, real_positions, open_orde
         action_summary.append((label, "HOLD (pending order already open, skipped)"))
         return
 
-    history = app.get_historical_data(request_id, contract, "60 D", "1 day", "MIDPOINT")
+    # TRADES, not MIDPOINT. MIDPOINT bars come back with volume = -1, so the
+    # strategy was running with no volume data at all. TRADES also prices from
+    # where trades actually printed rather than the bid/ask midpoint, which is
+    # the more honest series for equities and matches what the futures path
+    # already requests. It shifts EMA/RSI slightly, so signals can differ.
+    history = app.get_historical_data(request_id, contract, "60 D", "1 day", "TRADES")
 
     log(label + ": received " + str(len(history)) + " rows of historical data.")
 

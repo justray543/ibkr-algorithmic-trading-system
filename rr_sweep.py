@@ -61,6 +61,84 @@ DEFAULT_STOP_VALUES = [0.03, 0.05, 0.08]
 MIN_TRADES_FOR_CONFIDENCE = 30
 
 
+def compare_volume_filter(price_history, rr=None, stop=0.05,
+                          transaction_cost=0.001, lookbacks=(3, 5, 10)):
+    """
+    Does the volume-pressure filter earn its place?
+
+    Runs the identical strategy with and without the gate and reports both.
+    The filter can only ever REMOVE trades, so it justifies itself only by
+    raising expectancy per trade by more than it costs in sample size -- a
+    higher win rate on a third of the trades is not an improvement, it is a
+    smaller sample. Both numbers are shown side by side so that is visible.
+    """
+    from backtest import backtest_intraday_strategy as bt
+
+    def pooled(res):
+        """
+        Trade-weighted pooling across symbols.
+
+        Every intermediate stays a per-symbol Series until the final sum. An
+        earlier version summed the winner count first and then subtracted that
+        scalar from the per-symbol Series, which mixed the two and produced
+        average wins in the hundreds of percent.
+        """
+        if res.empty:
+            return None
+        n = float(res["closed_trades"].sum())
+        if n == 0:
+            return None
+
+        w = res["closed_trades"].astype(float)          # trades, per symbol
+        wins_per = res["win_rate_pct"] / 100.0 * w      # winners, per symbol
+        losers_per = w - wins_per                       # losers,  per symbol
+
+        total_wins = float(wins_per.sum())
+        total_losers = float(losers_per.sum())
+
+        gross_win = float((res["avg_win_pct"] / 100.0 * wins_per).sum())
+        gross_loss = float((res["avg_loss_pct"] / 100.0 * losers_per).sum())
+
+        aw = gross_win / total_wins if total_wins > 0 else 0.0
+        al = gross_loss / total_losers if total_losers > 0 else 0.0
+        wr = total_wins / n
+
+        exp = wr * aw - (1 - wr) * al
+
+        # Standard error of that expectancy, from a two-point approximation of
+        # the per-trade return distribution (a winner of aw with probability
+        # wr, a loser of -al otherwise). Crude, but it is the difference
+        # between "this filter helps" and "this filter moved the number by less
+        # than the number can be measured to". Without it the comparison below
+        # would call any positive delta an improvement.
+        var = wr * (aw - exp) ** 2 + (1 - wr) * (-al - exp) ** 2
+        se = (var ** 0.5) / (n ** 0.5) if n > 0 else float("inf")
+
+        return {"trades": int(n), "win_rate": wr * 100, "avg_win": aw * 100,
+                "avg_loss": al * 100, "payoff": (aw / al) if al > 0 else None,
+                "expectancy": exp * 100, "se": se * 100}
+
+    rows = []
+    base = pooled(bt(price_history, transaction_cost=transaction_cost,
+                     stop_loss_pct=stop, risk_reward_ratio=rr,
+                     require_volume_confirm=False))
+    if base:
+        rows.append({"filter": "off", "lookback": "-", **base})
+
+    for lb in lookbacks:
+        got = pooled(bt(price_history, transaction_cost=transaction_cost,
+                        stop_loss_pct=stop, risk_reward_ratio=rr,
+                        require_volume_confirm=True, volume_lookback=lb))
+        if got:
+            rows.append({"filter": "on", "lookback": lb, **got})
+
+    df = pd.DataFrame(rows)
+    if not df.empty and base:
+        df["trades_kept_pct"] = (df["trades"] / base["trades"] * 100).round(1)
+        df["expectancy_delta"] = (df["expectancy"] - base["expectancy"]).round(4)
+    return df
+
+
 def sweep(price_history, rr_values=None, stop_values=None,
           initial_capital=100000.0, transaction_cost=0.001,
           periods_per_year=252):
@@ -333,7 +411,8 @@ def load_from_tws():
     app.reqMarketDataType(3)
     out = {}
     for i, (label, cfg) in enumerate(build_instruments().items()):
-        df = app.get_historical_data(91000 + i, cfg["contract"], "1 Y", "1 day", "MIDPOINT")
+        # TRADES, not MIDPOINT: MIDPOINT bars come back with volume = -1.
+        df = app.get_historical_data(91000 + i, cfg["contract"], "1 Y", "1 day", "TRADES")
         if not df.empty and len(df) > 60:
             out[label] = df
             print("  {}: {} bars".format(label, len(df)))
@@ -353,6 +432,8 @@ def main():
     src.add_argument("--csv", help="CSV with a date index and a close column")
     src.add_argument("--tws", action="store_true",
                      help="pull 1Y daily bars for the equity universe from TWS")
+    ap.add_argument("--volume", action="store_true",
+                    help="also A/B the volume-pressure filter (needs TRADES bars)")
     ap.add_argument("--cost", type=float, default=0.001, help="per-side transaction cost")
     args = ap.parse_args()
 
@@ -366,6 +447,40 @@ def main():
 
     results = sweep(data, transaction_cost=args.cost)
     report(results, find_sweet_spot(results))
+
+    if args.volume:
+        print("\n\nVolume-pressure filter A/B  (identical strategy, gate on/off)")
+        print("=" * 96)
+        cmp = compare_volume_filter(data, transaction_cost=args.cost)
+        if cmp.empty:
+            print("  No usable volume in these bars -- refetch with whatToShow='TRADES'.")
+        else:
+            print(cmp.round(3).to_string(index=False))
+            on = cmp[cmp["filter"] == "on"]
+            base_row = cmp[cmp["filter"] == "off"].iloc[0]
+            if not on.empty:
+                best = on.loc[on["expectancy"].idxmax()]
+                # Combined standard error of the difference. The two runs share
+                # most of their trades so this is conservative, which is the
+                # right direction to err in.
+                se_diff = (best["se"] ** 2 + base_row["se"] ** 2) ** 0.5
+                sigmas = best["expectancy_delta"] / se_diff if se_diff > 0 else 0.0
+                print(f"\n  Best gate: lookback {best['lookback']} -> "
+                      f"expectancy {best['expectancy']:+.3f}% "
+                      f"({best['expectancy_delta']:+.3f} vs unfiltered), "
+                      f"keeping {best['trades_kept_pct']}% of trades.")
+                print(f"  Noise floor: +/-{se_diff:.3f}% (1 s.e. of the difference); "
+                      f"this delta is {sigmas:.2f} s.e.")
+                if abs(sigmas) < 2:
+                    print("  Verdict: NO MEASURABLE EFFECT. The change is smaller than the "
+                          "uncertainty on it -- keep the filter off.")
+                elif sigmas > 0:
+                    print("  Verdict: helps, and by more than the noise. Worth a live test.")
+                else:
+                    print("  Verdict: hurts by more than the noise.")
+                if best["trades"] < MIN_TRADES_FOR_CONFIDENCE:
+                    print(f"  WARNING: only {int(best['trades'])} trades survive the gate. "
+                          "Too few to conclude anything.")
     return 0
 
 

@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+import volume_pressure
+
 def backtest_intraday_strategy(
     price_history: dict,
     initial_capital: float = 100000.0,
@@ -8,6 +10,8 @@ def backtest_intraday_strategy(
     stop_loss_pct: float = 0.05,
     risk_reward_ratio: float = None,  # e.g. 2.0 means take-profit at 2x the stop distance
     periods_per_year: int = 252,      # 252 daily, 252*6.5 hourly, 252*78 5-min
+    require_volume_confirm: bool = False,  # gate entries on rising cumulative delta
+    volume_lookback: int = 5,
 ):
     results = {}
 
@@ -31,6 +35,20 @@ def backtest_intraday_strategy(
         loss = -delta.where(delta < 0, 0).rolling(window=14).mean()
         rs = gain / loss
         df['RSI'] = 100 - (100 / (1 + rs))
+
+        # Optional volume-pressure gate. Computed before the dropna so it stays
+        # aligned to the price rows it was derived from.
+        if require_volume_confirm:
+            rising = volume_pressure.pressure_rising(df, lookback=volume_lookback)
+            if rising is None:
+                # No traded volume -- MIDPOINT bars return -1. Running unfiltered
+                # here would silently produce a "with volume filter" result that
+                # is identical to the baseline, which is worse than skipping.
+                print(f"Skipping {symbol}: volume filter requested but bars carry no volume")
+                continue
+            df['VOL_OK'] = rising
+        else:
+            df['VOL_OK'] = True
 
         df = df.dropna().reset_index(drop=True)
 
@@ -74,7 +92,8 @@ def backtest_intraday_strategy(
                 trade_returns.append({"ret": trade_return, "reason": tag})
                 return trade_return
 
-            if position == 0 and curr['EMA9'] > curr['EMA21'] and curr['RSI'] > 50:
+            if (position == 0 and curr['EMA9'] > curr['EMA21'] and curr['RSI'] > 50
+                    and curr['VOL_OK']):
                 position = 1
                 entry_price = curr['close']
                 stop_price = entry_price * (1 - stop_loss_pct)
