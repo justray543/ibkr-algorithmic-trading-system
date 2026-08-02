@@ -12,6 +12,7 @@ from contract import future, stock
 from order import market, BUY, SELL
 from email_config import GMAIL_ADDRESS, GMAIL_APP_PASSWORD, RECIPIENT_EMAIL
 
+import metrics
 import trade_ledger as ledger
 import dashboard_export as dx
 import position_ownership as owner
@@ -67,7 +68,12 @@ def build_instruments():
     soxx_contract = stock("SOXX", "SMART", "USD", primary_exchange="NASDAQ")
     instruments["SOXX"] = {"contract": soxx_contract, "quantity": 10, "state_file": "soxx_position_state.json"}
 
-    hsi_contract = future("HSI", "HKFE", "20260730", currency="HKD")
+    # Rolled 2026-08-02 from 20260730, which expired and cash-settled on Jul 30.
+    # The broker closed the position; the local state file went on claiming it
+    # was open, so the dashboard reported ~+42,600 of unrealised P&L on a
+    # contract that no longer existed. Verified against IBKR's listed chain
+    # (app.front_contract) rather than assumed.
+    hsi_contract = future("HSI", "HKFE", "20260828", currency="HKD")
     instruments["HSI"] = {"contract": hsi_contract, "quantity": 1, "state_file": "hsi_position_state.json"}
 
     return instruments
@@ -399,6 +405,35 @@ if __name__ == "__main__":
         log("Cleared stale ownership claims: " + str(cleared))
 
     instruments = build_instruments()
+
+    # Expiry guard. The contract months above are hardcoded, so they go stale
+    # in silence: an expired future returns no bars, the run logs "insufficient
+    # data, skipped", and everything downstream reports success. HSI sat
+    # expired for three days that way while the dashboard published unrealised
+    # P&L on it. Check every contract against IBKR's own listed chain and say
+    # so loudly.
+    for label in instruments:
+        contract = instruments[label]["contract"]
+        if contract.secType != "FUT":
+            continue
+        raw = contract.lastTradeDateOrContractMonth
+        dte = metrics.days_to_expiry(raw)
+        if dte is None:
+            continue
+        if dte < 0:
+            probe = future(contract.symbol, contract.exchange, "",
+                           currency=contract.currency)
+            probe.lastTradeDateOrContractMonth = ""
+            suggested = app.front_contract(probe, 46000 + len(label))
+            nxt = suggested.lastTradeDateOrContractMonth if suggested else "unknown"
+            message = ("contract " + str(raw) + " EXPIRED " + str(abs(dte)) +
+                       "d ago - roll to " + str(nxt) + " in build_instruments()")
+            log(label + ": " + message)
+            ledger.record_health("error", label, message)
+        elif dte <= 5:
+            message = "contract " + str(raw) + " expires in " + str(dte) + "d - roll soon"
+            log(label + ": " + message)
+            ledger.record_health("warning", label, message)
 
     i = 0
     for label in instruments:

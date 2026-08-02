@@ -81,9 +81,60 @@ class IBClient(EClient):
 
     # ---------- contracts ----------
     def resolve_contract(self, contract, request_id=DEFAULT_CONTRACT_ID):
+        """
+        First matching contract, or None. Previously returned
+        self.resolved_contract, an attribute nothing ever assigned, so this
+        raised AttributeError on every call.
+        """
+        matches = self.resolve_contracts(contract, request_id)
+        return matches[0] if matches else None
+
+    def resolve_contracts(self, contract, request_id=DEFAULT_CONTRACT_ID,
+                          timeout=10):
+        """
+        Every contract matching the (possibly partial) spec, as ibapi Contract
+        objects. Passing a future with no lastTradeDateOrContractMonth returns
+        the whole listed chain, which is how expiries should be discovered
+        rather than hardcoded into a dict that silently goes stale.
+        """
+        self.wrapper.contract_details[request_id] = []
+        self.wrapper.contract_details_done.pop(request_id, None)
+
         self.reqContractDetails(reqId=request_id, contract=contract)
-        time.sleep(2)
-        return self.resolved_contract
+
+        waited = 0.0
+        while waited < timeout and not self.wrapper.contract_details_done.get(request_id):
+            time.sleep(0.25)
+            waited += 0.25
+
+        return [d.contract for d in self.wrapper.contract_details.get(request_id, [])]
+
+    def front_contract(self, contract, request_id=DEFAULT_CONTRACT_ID,
+                       min_days=5, today=None):
+        """
+        The nearest listed contract that is not about to expire.
+
+        min_days keeps the roll off the last few sessions, where liquidity
+        thins and the position would have to be rolled again immediately.
+        Returns None if the chain comes back empty, so the caller can fail
+        loudly rather than trade a guessed month.
+        """
+        from datetime import date, datetime
+        today = today or date.today()
+
+        dated = []
+        for c in self.resolve_contracts(contract, request_id):
+            raw = getattr(c, "lastTradeDateOrContractMonth", "") or ""
+            try:
+                exp = datetime.strptime(raw[:8], "%Y%m%d").date() if len(raw) >= 8 \
+                    else datetime.strptime(raw[:6] + "28", "%Y%m%d").date()
+            except ValueError:
+                continue
+            if (exp - today).days >= min_days:
+                dated.append((exp, c))
+
+        dated.sort(key=lambda t: t[0])
+        return dated[0][1] if dated else None
 
     # ---------- historical data ----------
     def get_historical_data(

@@ -15,6 +15,12 @@ class IBWrapper(EWrapper):
         self.account_pnl = {}
         self.portfolio_returns = None
         self.open_orders = {}  # symbol -> list of pending order statuses
+        # request_id -> list of resolved contracts. client.resolve_contract
+        # previously read self.resolved_contract, which nothing ever set, so
+        # every contract lookup raised AttributeError -- which is why expiries
+        # were hardcoded and went stale silently.
+        self.contract_details = {}
+        self.contract_details_done = {}
 
     def nextValidId(self, order_id):
         super().nextValidId(order_id)
@@ -69,6 +75,14 @@ class IBWrapper(EWrapper):
             execution.execId, execution.orderId, execution.shares,
             execution.lastLiquidity,
         )
+
+    def contractDetails(self, request_id, contract_details):
+        if request_id not in self.contract_details:
+            self.contract_details[request_id] = []
+        self.contract_details[request_id].append(contract_details)
+
+    def contractDetailsEnd(self, request_id):
+        self.contract_details_done[request_id] = True
 
     def historicalData(self, request_id, bar):
         bar_data = (
