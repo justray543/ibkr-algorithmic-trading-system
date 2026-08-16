@@ -198,6 +198,11 @@ def backtest_intraday_strategy(
             'profit_factor': round(profit_factor, 3) if profit_factor is not None else None,
             'stop_loss_hits': stop_loss_hits,
             'take_profit_hits': take_profit_hits,
+            # The individual round-trip returns, kept so monte_carlo.py can
+            # resample them. Aggregates cannot be resampled: a mean and a win
+            # rate do not carry the shape of the distribution, and the shape is
+            # the entire question when a few trades dominate the result.
+            'trade_returns': [t["ret"] for t in trade_returns],
             'final_equity_strategy': round(equity[-1], 2),
             'final_equity_buy_hold': round(initial_capital * (1 + buy_hold_return), 2)
         }
